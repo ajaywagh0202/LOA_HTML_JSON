@@ -42,6 +42,7 @@ a {
 .app-shell {
   display: grid;
   grid-template-columns: 244px minmax(0, 1fr);
+  width: 100%;
   min-height: 100vh;
 }
 
@@ -109,13 +110,14 @@ a {
 
 .main-content {
   width: 100%;
-  max-width: 1220px;
+  min-width: 0;
   padding: 28px;
 }
 
 .page-stack {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .page-heading {
@@ -140,6 +142,7 @@ a {
 }
 
 .panel {
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -151,6 +154,7 @@ a {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
+  width: 100%;
   padding: 18px;
 }
 
@@ -158,6 +162,7 @@ a {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
   min-height: 86px;
   padding: 18px;
   border: 1px dashed #9fb4b1;
@@ -165,6 +170,11 @@ a {
   background: #fbfdfc;
   color: #40505c;
   cursor: pointer;
+}
+
+.file-drop span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .file-drop input {
@@ -295,12 +305,15 @@ a {
 }
 
 .table-panel {
+  min-width: 0;
+  overflow: hidden;
   padding: 16px;
 }
 
 .table-toolbar {
   display: flex;
   gap: 10px;
+  min-width: 0;
   margin-bottom: 14px;
 }
 
@@ -309,6 +322,7 @@ a {
   align-items: center;
   gap: 9px;
   flex: 1;
+  min-width: 0;
   min-height: 42px;
   padding: 0 12px;
   border: 1px solid var(--line);
@@ -324,13 +338,56 @@ a {
 }
 
 .table-wrap {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   min-width: 820px;
+}
+
+.records-table {
+  min-width: 1180px;
+  table-layout: fixed;
+}
+
+.records-table th,
+.records-table td {
+  overflow-wrap: break-word;
+}
+
+.records-table .loa-no-cell {
+  width: 13%;
+}
+
+.records-table .tender-cell {
+  width: 39%;
+}
+
+.records-table .contractor-cell {
+  width: 10%;
+}
+
+.records-table .date-cell {
+  width: 8%;
+  white-space: nowrap;
+}
+
+.records-table .value-cell {
+  width: 12%;
+  white-space: nowrap;
+}
+
+.records-table .status-cell {
+  width: 9%;
+}
+
+.records-table .actions-cell {
+  width: 9%;
 }
 
 th,
@@ -356,6 +413,7 @@ th {
 .row-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .status-badge {
@@ -556,6 +614,10 @@ pre {
   .summary-grid,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .upload-panel .button {
+    width: 100%;
   }
 
   .table-toolbar,

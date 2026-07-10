@@ -126,7 +126,7 @@ const LoaListPage = () => {
         {message && <div className="notice success">{message}</div>}
 
         <div className="table-wrap">
-          <table>
+          <table className="records-table">
             <thead>
               <tr>
                 <th>LOA No</th>
@@ -149,18 +149,18 @@ const LoaListPage = () => {
               ) : records.length ? (
                 records.map((record) => (
                   <tr key={record._id}>
-                    <td className="strong-cell">{record.loa_no}</td>
-                    <td>{record.tender_no || '-'}</td>
-                    <td>{record.contractor_name || '-'}</td>
-                    <td>{record.letter_date || '-'}</td>
-                    <td>{formatCurrency(record.contract_value)}</td>
-                    <td>
+                    <td className="strong-cell loa-no-cell">{record.loa_no}</td>
+                    <td className="tender-cell">{record.tender_no || '-'}</td>
+                    <td className="contractor-cell">{record.contractor_name || '-'}</td>
+                    <td className="date-cell">{record.letter_date || '-'}</td>
+                    <td className="value-cell">{formatCurrency(record.contract_value)}</td>
+                    <td className="status-cell">
                       <span className={`status-badge ${record.postgres_synced ? 'success' : 'muted'}`}>
                         {record.postgres_synced ? <CheckCircle2 size={14} /> : null}
                         {record.postgres_synced ? 'Synced' : 'Not synced'}
                       </span>
                     </td>
-                    <td>
+                    <td className="actions-cell">
                       <div className="row-actions">
                         <button
                           className="icon-button"
