@@ -59,6 +59,7 @@ cd frontend
 cp .env.example .env
 npm install
 npm run dev
+npm run dev -- --host IP_ADDRESS
 ```
 
 Frontend runs at `http://localhost:5173`.
