@@ -74,10 +74,10 @@ const LoaDetailsPage = () => {
           <p className="eyebrow">LOA Details</p>
           <h2>{record.loa_no}</h2>
         </div>
-        <Link className="button primary" to={`/loa/${record._id}/edit`}>
+        {/* <Link className="button primary" to={`/loa/${record._id}/edit`}>
           <Edit size={18} />
           Edit
-        </Link>
+        </Link> */}
       </div>
 
       <div className="panel summary-panel">
