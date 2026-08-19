@@ -33,6 +33,20 @@ const buildSearchFilter = (search) => {
   };
 };
 
+const buildLoaListFilter = (search, syncStatus) => {
+  const filter = buildSearchFilter(search);
+
+  if (syncStatus === 'synced') {
+    filter.postgres_synced = true;
+  }
+
+  if (syncStatus === 'unsynced') {
+    filter.postgres_synced = { $ne: true };
+  }
+
+  return filter;
+};
+
 export const uploadLoa = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw createError('HTML file is required.', 400);
@@ -117,7 +131,7 @@ export const uploadLoaBulk = asyncHandler(async (req, res) => {
 
 export const getLoaLetters = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
-  const filter = buildSearchFilter(req.query.search);
+  const filter = buildLoaListFilter(req.query.search, req.query.syncStatus);
 
   const [records, total] = await Promise.all([
     LoaLetter.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),

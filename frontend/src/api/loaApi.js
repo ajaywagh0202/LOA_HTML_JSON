@@ -31,9 +31,9 @@ export const uploadLoaFilesBulk = async (files, onUploadProgress) => {
   return response.data;
 };
 
-export const getLoaLetters = async ({ page = 1, limit = 10, search = '' } = {}) => {
+export const getLoaLetters = async ({ page = 1, limit = 10, search = '', syncStatus = 'all' } = {}) => {
   const response = await api.get('/loa', {
-    params: { page, limit, search }
+    params: { page, limit, search, syncStatus }
   });
   return response.data;
 };

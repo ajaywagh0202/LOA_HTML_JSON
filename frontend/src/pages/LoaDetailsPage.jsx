@@ -1,6 +1,8 @@
 import { Check, Copy, Edit, Loader2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import JsonView from '@uiw/react-json-view';
+import { githubDarkTheme } from '@uiw/react-json-view/githubDark';
 import { getLoaById } from '../api/loaApi.js';
 
 const formatJson = (value) => JSON.stringify(value || {}, null, 2);
@@ -128,7 +130,17 @@ const LoaDetailsPage = () => {
         {copyStatus === 'failed' && (
           <div className="inline-error">Copy failed. Select the JSON text and press Ctrl+C.</div>
         )}
-        <pre>{formatJson(record.json_data)}</pre>
+        <div className="json-viewer-wrap">
+          <JsonView
+            value={record.json_data || {}}
+            style={githubDarkTheme}
+            collapsed={2}
+            displayDataTypes={false}
+            displayObjectSize
+            enableClipboard
+            shortenTextAfterLength={120}
+          />
+        </div>
       </div>
     </section>
   );

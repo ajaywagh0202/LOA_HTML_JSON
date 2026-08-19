@@ -10,10 +10,10 @@
   --line: #dce2e6;
   --text: #1d252c;
   --muted: #63717c;
-  --primary: #14756f;
-  --primary-strong: #0e5f5a;
+  --primary: #fe7109;
+  --primary-strong: #fe7109;
   --danger: #b42318;
-  --amber: #b86b14;
+  --amber: #f7b264;
   --shadow: 0 14px 28px rgba(20, 35, 43, 0.08);
 }
 
@@ -68,7 +68,7 @@ a {
   width: 46px;
   height: 46px;
   border-radius: 8px;
-  background: #173b38;
+  background: #fe7109;
   color: #ffffff;
   font-size: 13px;
   font-weight: 800;
@@ -408,7 +408,7 @@ a {
 }
 
 .bulk-result-counts .success strong {
-  color: #16613d;
+  color: #fe7109;
 }
 
 .bulk-result-counts .failed {
@@ -606,6 +606,37 @@ a {
   color: var(--text);
 }
 
+.sync-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #40505c;
+}
+
+.sync-filter:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(20, 117, 111, 0.14);
+}
+
+.sync-filter span {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.sync-filter select {
+  min-width: 140px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
 .table-wrap {
   width: 100%;
   max-width: 100%;
@@ -657,6 +688,38 @@ table {
 
 .records-table .actions-cell {
   width: 9%;
+}
+
+.records-grid {
+  width: 100%;
+  height: 650px;
+  --ag-accent-color: var(--primary);
+  --ag-background-color: #ffffff;
+  --ag-border-color: var(--line);
+  --ag-header-background-color: #f4f7f7;
+  --ag-header-text-color: #40505c;
+  --ag-odd-row-background-color: #fbfcfc;
+  --ag-row-hover-color: #eef6f4;
+  --ag-wrapper-border-radius: 8px;
+  --ag-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ag-font-size: 13px;
+}
+
+.records-grid .ag-cell {
+  display: flex;
+  align-items: center;
+  line-height: 1.4;
+}
+
+.records-grid .ag-cell-wrap-text {
+  align-items: flex-start;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.ag-grid-row-actions {
+  height: 100%;
+  align-items: center;
 }
 
 th,
@@ -778,13 +841,17 @@ th {
   font-weight: 750;
 }
 
-pre {
-  margin: 0;
+.json-viewer-wrap {
   max-height: 620px;
   padding: 16px;
   overflow: auto;
-  background: #18201f;
-  color: #e8f4ef;
+  background: #0d1117;
+}
+
+.json-viewer-wrap > div {
+  min-width: max-content;
+  background: transparent !important;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace !important;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -1191,6 +1258,10 @@ pre {
   .section-heading-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .sync-filter select {
+    flex: 1;
   }
 
   .grid-toolbar {
