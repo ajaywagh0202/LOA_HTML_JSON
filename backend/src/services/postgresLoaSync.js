@@ -139,10 +139,14 @@ const normalizeBreakup = (breakup) => ({
   source: breakup.source || 'item_breakup'
 });
 
-const ensureLoaNoColumns = async (client) => {
+const ensureSyncColumns = async (client) => {
   await client.query('ALTER TABLE public.contract_schedules ADD COLUMN IF NOT EXISTS loa_no VARCHAR(100)');
   await client.query('ALTER TABLE public.awarded_items ADD COLUMN IF NOT EXISTS loa_no VARCHAR(100)');
   await client.query('ALTER TABLE public.item_breakups ADD COLUMN IF NOT EXISTS loa_no VARCHAR(100)');
+  await client.query('ALTER TABLE public.contracts ADD COLUMN IF NOT EXISTS loa_dt DATE');
+  await client.query('ALTER TABLE public.contracts ADD COLUMN IF NOT EXISTS completion_date DATE');
+  await client.query('ALTER TABLE public.contracts ADD COLUMN IF NOT EXISTS rebate_rate NUMERIC');
+  await client.query('ALTER TABLE public.contracts ADD COLUMN IF NOT EXISTS tender_valid_upto_dt DATE');
 };
 
 const backfillExistingLoaNo = async (client, loaNo, contractId) => {
@@ -179,54 +183,145 @@ const backfillExistingLoaNo = async (client, loaNo, contractId) => {
   );
 };
 
-const insertContract = async (client, mongoDoc, jsonData) => {
+const getContractValues = (mongoDoc, jsonData) => {
   const contractValue = valueWithRaw(jsonData.contract_value ?? mongoDoc.contract_value);
   const emd = valueWithRaw(jsonData.emd_amount);
   const performanceGuarantee = valueWithRaw(jsonData.performance_guarantee_amount);
   const railway = jsonData.railway_details || {};
   const contractor = jsonData.contractor || {};
 
+  return [
+    emptyToNull(mongoDoc.loa_no || jsonData.loa_no),
+    emptyToNull(mongoDoc.letter_no_full || jsonData.letter_no_full),
+    emptyToNull(mongoDoc.tender_no || jsonData.tender_no),
+    emptyToNull(mongoDoc.bid_id || jsonData.bid_id),
+    emptyToNull(jsonData.td_id),
+    emptyToNull(jsonData.td_version),
+    emptyToNull(mongoDoc.contractor_name || contractor.name),
+    emptyToNull(contractor.address),
+    emptyToNull(railway.railway || railway.zone),
+    emptyToNull(railway.division),
+    emptyToNull(railway.department),
+    emptyToNull(railway.office),
+    emptyToNull(mongoDoc.letter_date || jsonData.letter_date),
+    emptyToNull(jsonData.loa_date || jsonData.loa_dt),
+    emptyToNull(jsonData.work_description),
+    contractValue.amount,
+    contractValue.raw,
+    emd.amount,
+    emd.raw,
+    performanceGuarantee.amount,
+    emptyToNull(jsonData.completion_period),
+    emptyToNull(jsonData.completion_date),
+    toNumeric(jsonData.rebate_rate),
+    emptyToNull(jsonData.tender_valid_upto_date || jsonData.tender_valid_upto_dt)
+  ];
+};
+
+const insertContract = async (client, mongoDoc, jsonData) => {
+  const values = getContractValues(mongoDoc, jsonData);
+
   await client.query(
     `
       INSERT INTO public.contracts (
         _id, loa_no, letter_no_full, tender_no, bid_id, td_id, td_version,
         contractor_name, contractor_address, railway_zone, railway_division,
-        railway_department, railway_office, letter_date, work_description,
+        railway_department, railway_office, letter_date, loa_dt, work_description,
         contract_value, contract_value_raw, emd_amount, emd_raw,
-        performance_guarantee_amount, completion_period
+        performance_guarantee_amount, completion_period, completion_date,
+        rebate_rate, tender_valid_upto_dt
       )
       VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10, $11,
-        $12, $13, CASE WHEN $14::text IS NULL THEN NULL ELSE TO_DATE($14, 'DD-MM-YYYY') END, $15,
-        $16, $17, $18, $19,
-        $20, $21
+        $12, $13,
+        CASE WHEN $14::text IS NULL THEN NULL ELSE TO_DATE($14, 'DD-MM-YYYY') END,
+        CASE WHEN $15::text IS NULL THEN NULL ELSE TO_DATE($15, 'DD-MM-YYYY') END,
+        $16, $17, $18, $19, $20, $21, $22,
+        CASE WHEN $23::text IS NULL THEN NULL ELSE TO_DATE($23, 'DD-MM-YYYY') END,
+        $24,
+        CASE WHEN $25::text IS NULL THEN NULL ELSE TO_DATE($25, 'DD-MM-YYYY') END
       )
     `,
-    [
-      getMongoId(mongoDoc),
-      emptyToNull(mongoDoc.loa_no || jsonData.loa_no),
-      emptyToNull(mongoDoc.letter_no_full || jsonData.letter_no_full),
-      emptyToNull(mongoDoc.tender_no || jsonData.tender_no),
-      emptyToNull(mongoDoc.bid_id || jsonData.bid_id),
-      emptyToNull(jsonData.td_id),
-      emptyToNull(jsonData.td_version),
-      emptyToNull(mongoDoc.contractor_name || contractor.name),
-      emptyToNull(contractor.address),
-      emptyToNull(railway.railway || railway.zone),
-      emptyToNull(railway.division),
-      emptyToNull(railway.department),
-      emptyToNull(railway.office),
-      emptyToNull(mongoDoc.letter_date || jsonData.letter_date),
-      emptyToNull(jsonData.work_description),
-      contractValue.amount,
-      contractValue.raw,
-      emd.amount,
-      emd.raw,
-      performanceGuarantee.amount,
-      emptyToNull(jsonData.completion_period)
-    ]
+    [getMongoId(mongoDoc), ...values]
   );
+};
+
+const updateExistingContract = async (client, contractId, mongoDoc, jsonData) => {
+  const values = getContractValues(mongoDoc, jsonData);
+
+  await client.query(
+    `
+      UPDATE public.contracts
+      SET
+        loa_no = COALESCE($1, loa_no),
+        letter_no_full = COALESCE($2, letter_no_full),
+        tender_no = COALESCE($3, tender_no),
+        bid_id = COALESCE($4, bid_id),
+        td_id = COALESCE($5, td_id),
+        td_version = COALESCE($6, td_version),
+        contractor_name = COALESCE($7, contractor_name),
+        contractor_address = COALESCE($8, contractor_address),
+        railway_zone = COALESCE($9, railway_zone),
+        railway_division = COALESCE($10, railway_division),
+        railway_department = COALESCE($11, railway_department),
+        railway_office = COALESCE($12, railway_office),
+        letter_date = COALESCE(
+          CASE WHEN $13::text IS NULL THEN NULL ELSE TO_DATE($13, 'DD-MM-YYYY') END,
+          letter_date
+        ),
+        loa_dt = COALESCE(
+          CASE WHEN $14::text IS NULL THEN NULL ELSE TO_DATE($14, 'DD-MM-YYYY') END,
+          loa_dt
+        ),
+        work_description = COALESCE($15, work_description),
+        contract_value = COALESCE($16, contract_value),
+        contract_value_raw = COALESCE($17, contract_value_raw),
+        emd_amount = COALESCE($18, emd_amount),
+        emd_raw = COALESCE($19, emd_raw),
+        performance_guarantee_amount = COALESCE($20, performance_guarantee_amount),
+        completion_period = COALESCE($21, completion_period),
+        completion_date = COALESCE(
+          CASE WHEN $22::text IS NULL THEN NULL ELSE TO_DATE($22, 'DD-MM-YYYY') END,
+          completion_date
+        ),
+        rebate_rate = COALESCE($23, rebate_rate),
+        tender_valid_upto_dt = COALESCE(
+          CASE WHEN $24::text IS NULL THEN NULL ELSE TO_DATE($24, 'DD-MM-YYYY') END,
+          tender_valid_upto_dt
+        )
+      WHERE _id = $25
+    `,
+    [...values, contractId]
+  );
+};
+
+const updateExistingSchedules = async (client, schedules) => {
+  for (const schedule of schedules) {
+    const scheduleId = emptyToNull(schedule.schedule_id || schedule.row_id);
+    if (!scheduleId) {
+      continue;
+    }
+
+    await client.query(
+      `
+        UPDATE public.contract_schedules
+        SET
+          bid_rate_or_unit_rate = COALESCE($2, bid_rate_or_unit_rate),
+          bid_type = COALESCE($3, bid_type),
+          bid_type_text = COALESCE($4, bid_type_text),
+          bid_amount = COALESCE($5, bid_amount)
+        WHERE schedule_id = $1
+      `,
+      [
+        scheduleId,
+        toNumeric(schedule.bid_rate_or_unit_rate || schedule.bid_rate),
+        emptyToNull(schedule.bid_type),
+        emptyToNull(schedule.bid_type_text),
+        toNumeric(schedule.bid_amount || schedule.schedule_total)
+      ]
+    );
+  }
 };
 
 const insertSchedule = async (client, contractId, loaNo, schedule, index) => {
@@ -357,20 +452,30 @@ export const syncLoaToPostgres = async (mongoDoc) => {
   let transactionStarted = false;
 
   try {
-    await ensureLoaNoColumns(client);
+    await ensureSyncColumns(client);
 
     const existing = await client.query('SELECT _id FROM public.contracts WHERE loa_no = $1 LIMIT 1', [loaNo]);
     if (existing.rowCount > 0) {
-      await backfillExistingLoaNo(client, loaNo, existing.rows[0]._id);
-      console.info(`[postgres-sync] skipped duplicate loa_no=${loaNo} mongoId=${mongoId}`);
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      const contractId = existing.rows[0]._id;
+      await backfillExistingLoaNo(client, loaNo, contractId);
+      await updateExistingContract(client, contractId, mongoDoc, jsonData);
+      await updateExistingSchedules(client, getSchedules(jsonData));
+
+      await client.query('COMMIT');
+      transactionStarted = false;
+      console.info(`[postgres-sync] refreshed duplicate loa_no=${loaNo} mongoId=${mongoId}`);
       return {
         synced: true,
         skipped: true,
         alreadyExists: true,
-        reason: 'duplicate_loa_no',
+        reason: 'duplicate_loa_no_refreshed',
         loa_no: loaNo,
         mongoId,
-        postgresId: existing.rows[0]._id
+        postgresId: contractId,
+        tablesWritten: ['contracts', 'contract_schedules']
       };
     }
 

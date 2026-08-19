@@ -4,6 +4,7 @@ import EditLoaPage from './pages/EditLoaPage.jsx';
 import LoaDetailsPage from './pages/LoaDetailsPage.jsx';
 import LoaListPage from './pages/LoaListPage.jsx';
 import UploadLoaPage from './pages/UploadLoaPage.jsx';
+import ViewLOA from './pages/ViewLOA.jsx';
 import React from 'react';
 
 const App = () => {
@@ -12,6 +13,7 @@ const App = () => {
       <Route element={<Layout />}>
         <Route index element={<Navigate to="/upload" replace />} />
         <Route path="/upload" element={<UploadLoaPage />} />
+        <Route path="/view-loa" element={<ViewLOA />} />
         <Route path="/loa" element={<LoaListPage />} />
         <Route path="/loa/:id" element={<LoaDetailsPage />} />
         <Route path="/loa/:id/edit" element={<EditLoaPage />} />

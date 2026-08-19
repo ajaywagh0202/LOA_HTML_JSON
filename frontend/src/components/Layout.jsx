@@ -1,6 +1,8 @@
 import React from 'react';
-import { FileUp, ListChecks } from 'lucide-react';
+import { FileSearch, FileUp, Home, ListChecks } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+
+const HOME_URL = "http://10.31.3.227/larbank";
 
 const Layout = () => {
   return (
@@ -23,10 +25,23 @@ const Layout = () => {
             <ListChecks size={18} />
             Records
           </NavLink>
+          <NavLink
+            to="/view-loa"
+            className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+          >
+            <FileSearch size={18} />
+            View LOA
+          </NavLink>
         </nav>
       </aside>
 
       <main className="main-content">
+        <div className="global-page-actions">
+          <button className="button primary" type="button" onClick={() => window.open(HOME_URL)}>
+            <Home size={18} />
+            Home
+          </button>
+        </div>
         <Outlet />
       </main>
     </div>

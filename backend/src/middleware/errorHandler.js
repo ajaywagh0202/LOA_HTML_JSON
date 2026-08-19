@@ -16,6 +16,9 @@ export const errorHandler = (error, req, res, next) => {
     if (error.code === 'LIMIT_FILE_SIZE') {
       message = 'File is too large. Maximum allowed size is 10 MB.';
     }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      message = 'Too many files. Maximum allowed count is 150.';
+    }
   }
 
   if (error instanceof mongoose.Error.CastError) {
@@ -34,4 +37,3 @@ export const errorHandler = (error, req, res, next) => {
     ...(process.env.NODE_ENV === 'development' ? { stack: error.stack } : {})
   });
 };
-

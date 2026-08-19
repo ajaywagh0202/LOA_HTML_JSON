@@ -17,6 +17,20 @@ export const uploadLoaFile = async (file) => {
   return response.data;
 };
 
+export const uploadLoaFilesBulk = async (files, onUploadProgress) => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
+
+  const response = await api.post('/loa/upload-bulk', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    onUploadProgress
+  });
+
+  return response.data;
+};
+
 export const getLoaLetters = async ({ page = 1, limit = 10, search = '' } = {}) => {
   const response = await api.get('/loa', {
     params: { page, limit, search }
@@ -25,7 +39,17 @@ export const getLoaLetters = async ({ page = 1, limit = 10, search = '' } = {}) 
 };
 
 export const getLoaById = async (id) => {
-  const response = await api.get(`/loa/${id}`);
+  const response = await api.get(`/loa/record/${id}`);
+  return response.data;
+};
+
+export const getViewLoaList = async () => {
+  const response = await api.get('/loa/list');
+  return response.data;
+};
+
+export const getViewLoa = async (loaNo) => {
+  const response = await api.get(`/loa/${encodeURIComponent(loaNo)}`);
   return response.data;
 };
 

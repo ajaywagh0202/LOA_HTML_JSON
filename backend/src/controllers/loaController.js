@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
 import LoaLetter from '../models/LoaLetter.js';
+import { processLoaHtmlFile } from '../services/loaUploadService.js';
+import { getPostgresLoaDetails, listPostgresLoas } from '../services/postgresLoaRead.js';
 import { syncLoaToPostgres } from '../services/postgresLoaSync.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { parseLoaHtml } from '../utils/loaParser.js';
 
 const createError = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -37,66 +38,80 @@ export const uploadLoa = asyncHandler(async (req, res) => {
     throw createError('HTML file is required.', 400);
   }
 
-  const html = req.file.buffer.toString('utf8');
-  const parsed = parseLoaHtml(html, { sourceFileName: req.file.originalname });
-
-  if (!parsed.loa_no) {
-    throw createError('Unable to extract LOA number from the uploaded HTML file.', 422);
-  }
-
-  const payload = {
-    loa_no: parsed.loa_no,
-    letter_no_full: parsed.letter_no_full,
-    tender_no: parsed.tender_no,
-    bid_id: parsed.bid_id,
-    contractor_name: parsed.contractor_name,
-    letter_date: parsed.letter_date,
-    contract_value: parsed.contract_value,
-    json_data: parsed.json_data,
-    original_file_name: req.file.originalname,
-    uploaded_at: new Date()
-  };
-
-  let record = await LoaLetter.findOne({ loa_no: parsed.loa_no });
-  const action = record ? 'updated' : 'created';
-
-  if (record) {
-    Object.assign(record, payload);
-    await record.save();
-  } else {
-    record = await LoaLetter.create(payload);
-  }
-
-  let postgresSync = {
-    synced: false,
-    skipped: false,
-    loa_no: parsed.loa_no
-  };
-
-  try {
-    postgresSync = await syncLoaToPostgres(record);
-
-    if (postgresSync.synced) {
-      record.postgres_synced = true;
-      record.postgres_synced_at = new Date();
-      await record.save();
-    }
-  } catch (error) {
-    postgresSync = {
-      synced: false,
-      skipped: false,
-      loa_no: parsed.loa_no,
-      mongoId: String(record._id),
-      error: error.message
-    };
-  }
+  const { action, mongoId, postgresSync, record } = await processLoaHtmlFile(req.file);
 
   res.status(action === 'created' ? 201 : 200).json({
     success: true,
     action,
-    mongoId: String(record._id),
+    mongoId,
     postgresSync,
     data: record
+  });
+});
+
+const processWithConcurrency = async (files, concurrency, handler) => {
+  const results = new Array(files.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < files.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await handler(files[currentIndex]);
+    }
+  };
+
+  const workerCount = Math.min(concurrency, files.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+};
+
+export const uploadLoaBulk = asyncHandler(async (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+
+  if (!files.length) {
+    throw createError('At least one HTML file is required.', 400);
+  }
+
+  const results = await processWithConcurrency(files, 5, async (file) => {
+    try {
+      const uploadResult = await processLoaHtmlFile(file);
+
+      if (uploadResult.postgresSync.error) {
+        console.error(
+          `[loa-bulk] PostgreSQL sync failed file=${file.originalname} loa_no=${uploadResult.record.loa_no}`,
+          uploadResult.postgresSync.error
+        );
+        return {
+          fileName: file.originalname,
+          status: 'failed',
+          loa_no: uploadResult.record.loa_no,
+          error: 'Unable to sync this LOA to PostgreSQL.'
+        };
+      }
+
+      return {
+        fileName: file.originalname,
+        status: 'success',
+        loa_no: uploadResult.record.loa_no
+      };
+    } catch (error) {
+      console.error(`[loa-bulk] Upload failed file=${file.originalname}`, error);
+      return {
+        fileName: file.originalname,
+        status: 'failed',
+        error: error.statusCode ? error.message : 'Unable to process this file.'
+      };
+    }
+  });
+
+  const successCount = results.filter((result) => result.status === 'success').length;
+
+  res.json({
+    totalFiles: files.length,
+    successCount,
+    failedCount: files.length - successCount,
+    results
   });
 });
 
@@ -158,6 +173,42 @@ export const getLoaByNumber = asyncHandler(async (req, res) => {
 });
 
 export const getLoaByNumberPost = getLoaByNumber;
+
+export const getViewLoaList = asyncHandler(async (req, res) => {
+  try {
+    const records = await listPostgresLoas();
+    res.json(records);
+  } catch (error) {
+    console.error('[loa-view] Failed to load PostgreSQL LOA list', error);
+    throw createError('Unable to load LOA list.', 500);
+  }
+});
+
+export const getViewLoa = asyncHandler(async (req, res) => {
+  const loaNo = String(req.params.loaNo || '').trim();
+
+  if (!loaNo) {
+    throw createError('LOA number is required.', 400);
+  }
+
+  if (loaNo.length > 100 || !/^[a-zA-Z0-9]+$/.test(loaNo)) {
+    throw createError('Invalid LOA number. Use 1 to 100 alphanumeric characters.', 400);
+  }
+
+  let details;
+  try {
+    details = await getPostgresLoaDetails(loaNo);
+  } catch (error) {
+    console.error(`[loa-view] Failed to load PostgreSQL LOA loa_no=${loaNo}`, error);
+    throw createError('Unable to load LOA details.', 500);
+  }
+
+  if (!details.contract) {
+    throw createError(`LOA ${loaNo} was not found.`, 404);
+  }
+
+  res.json(details);
+});
 
 export const syncLoaByMongoId = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.mongoId)) {

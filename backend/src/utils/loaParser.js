@@ -171,6 +171,39 @@ export const normalizeText = (value = '') => {
 
 const compactText = (value = '') => normalizeText(value).replace(/\s+/g, ' ').trim();
 
+const normalizeDate = (value = '') => {
+  const match = compactText(value).match(/\b([0-3]?\d)[./-]([01]?\d)[./-](\d{2,4})\b/);
+  if (!match) {
+    return '';
+  }
+
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return `${match[1].padStart(2, '0')}-${match[2].padStart(2, '0')}-${year}`;
+};
+
+const addMonthsToDate = (dateValue, months) => {
+  const normalizedDate = normalizeDate(dateValue);
+  const monthCount = Number.parseInt(months, 10);
+  if (!normalizedDate || !Number.isFinite(monthCount)) {
+    return '';
+  }
+
+  const [day, month, year] = normalizedDate.split('-').map(Number);
+  const targetMonthStart = new Date(Date.UTC(year, month - 1 + monthCount, 1));
+  const lastDay = new Date(
+    Date.UTC(targetMonthStart.getUTCFullYear(), targetMonthStart.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  const result = new Date(
+    Date.UTC(targetMonthStart.getUTCFullYear(), targetMonthStart.getUTCMonth(), Math.min(day, lastDay))
+  );
+
+  return [
+    String(result.getUTCDate()).padStart(2, '0'),
+    String(result.getUTCMonth() + 1).padStart(2, '0'),
+    result.getUTCFullYear()
+  ].join('-');
+};
+
 const canonicalKey = (value = '') => compactText(value).toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const isScalarValue = (value) => {
@@ -200,6 +233,127 @@ const getBodyLines = ($) => {
     .split(/\r?\n/)
     .map((line) => compactText(line))
     .filter(Boolean);
+};
+
+const getLetterHeader = ($) => {
+  const letterNumberElement = $('#letterNoVal').first();
+  const letterRow = letterNumberElement.closest('tr');
+  const letterCell = letterNumberElement.closest('td');
+  const letterNoFull = removeLabel(compactText(letterCell.text()), 'Letter No');
+  const datedCell = letterRow
+    .find('td')
+    .toArray()
+    .map((cell) => compactText($(cell).text()))
+    .find((text) => /^Dated\s*:/i.test(text));
+
+  return {
+    letter_no_full: letterNoFull,
+    loa_date: normalizeDate(datedCell || '')
+  };
+};
+
+const getTenderReference = ($) => {
+  let referenceText = '';
+  $('td').each((_, cell) => {
+    const text = compactText($(cell).text());
+    if (!referenceText && /^Tender\s+No\.?\s+/i.test(text) && /closing\s+date/i.test(text)) {
+      referenceText = text;
+    }
+  });
+
+  const tenderNo = referenceText.match(/^Tender\s+No\.?\s+(.+?)\s+closing\s+date\b/i)?.[1] || '';
+  const tenderValidUptoDate = referenceText.match(
+    /closing\s+date\s+([0-3]?\d[./-][01]?\d[./-]\d{2,4})/i
+  )?.[1];
+  const workDescription = referenceText.match(/\s+for\s+(.+)$/i)?.[1] || '';
+
+  let bidReferenceDate = '';
+  $('td').each((_, cell) => {
+    const text = compactText($(cell).text());
+    if (bidReferenceDate || !/Your\s+bid\s+ID/i.test(text)) {
+      return;
+    }
+
+    bidReferenceDate = normalizeDate(text.match(/\bdated\s+([0-3]?\d[./-][01]?\d[./-]\d{2,4})/i)?.[1] || '');
+  });
+
+  return {
+    tender_no: compactText(tenderNo),
+    tender_valid_upto_date: normalizeDate(tenderValidUptoDate || ''),
+    work_description: compactText(workDescription),
+    letter_date: bidReferenceDate
+  };
+};
+
+const getContractorDetails = ($) => {
+  let contractorRow = null;
+
+  $('tr').each((_, row) => {
+    if (contractorRow) {
+      return;
+    }
+
+    const text = compactText($(row).children('td').first().text());
+    if (/^M\/s\b/i.test(text)) {
+      contractorRow = $(row);
+    }
+  });
+
+  if (!contractorRow) {
+    return { name: '', address: '' };
+  }
+
+  const name = compactText(contractorRow.children('td').first().text()).replace(/^M\/s\s*/i, '');
+  const addressLines = [];
+  let nextRow = contractorRow.next();
+
+  while (nextRow.length) {
+    const text = compactText(nextRow.children('td').first().text());
+    if (!text || /^(Sub|Ref)\s*:/i.test(text)) {
+      break;
+    }
+
+    addressLines.push(text);
+    nextRow = nextRow.next();
+  }
+
+  return {
+    name,
+    address: addressLines.join(', ')
+  };
+};
+
+const getRailwayHeaderDetails = ($) => {
+  const letterRow = $('#letterNoVal').first().closest('tr');
+  const headerLines = letterRow
+    .prevAll('tr')
+    .toArray()
+    .reverse()
+    .flatMap((row) =>
+      $(row)
+        .children('td')
+        .toArray()
+        .map((cell) => compactText($(cell).text()))
+    )
+    .filter(Boolean);
+  const railway = headerLines.find((line) => /\bRLY\b/i.test(line) && !/^Office\b/i.test(line)) || '';
+  const divisionDepartment = headerLines.find((line) => /\bDIVISION\b/i.test(line)) || '';
+  const divisionMatch = divisionDepartment.match(/^(.*?)\s*-?\s*DIVISION\s*-?\s*(.*)$/i);
+  const officeIndex = headerLines.findIndex((line) => /^Office\b/i.test(line));
+  const office =
+    officeIndex === -1
+      ? ''
+      : headerLines
+          .slice(officeIndex)
+          .map((line) => line.replace(/,\s*$/, ''))
+          .join(', ');
+
+  return {
+    railway,
+    division: compactText(divisionMatch?.[1] || divisionDepartment),
+    department: compactText(divisionMatch?.[2] || ''),
+    office
+  };
 };
 
 const removeLabel = (text, label) => {
@@ -462,17 +616,19 @@ const extractImportantConditions = ($) => {
 };
 
 const getRailwayDetails = ($, hiddenValues) => {
+  const headerDetails = getRailwayHeaderDetails($);
+
   return {
-    railway:
+    railway: headerDetails.railway ||
       findValueByLabels($, ['railway', 'zonal railway']) ||
       findDeepValue(hiddenValues, [/railway/i, /zone/i]),
-    division:
+    division: headerDetails.division ||
       findValueByLabels($, ['division', 'divn']) ||
       findDeepValue(hiddenValues, [/division/i, /divn/i]),
-    department:
+    department: headerDetails.department ||
       findValueByLabels($, ['department', 'dept']) ||
       findDeepValue(hiddenValues, [/department/i, /dept/i]),
-    office:
+    office: headerDetails.office ||
       findValueByLabels($, ['office', 'office name']) ||
       findDeepValue(hiddenValues, [/office/i])
   };
@@ -1261,6 +1417,17 @@ const extractScheduleBreakup = ($, hiddenValues) => {
     });
   });
 
+  const firstSchedule = schedules[0];
+  if (firstSchedule) {
+    schedules.forEach((schedule) => {
+      schedule.bid_rate_or_unit_rate =
+        schedule.bid_rate_or_unit_rate || firstSchedule.bid_rate_or_unit_rate;
+      schedule.bid_type = schedule.bid_type || firstSchedule.bid_type;
+      schedule.bid_type_text = schedule.bid_type_text || firstSchedule.bid_type_text;
+      schedule.bid_amount = schedule.bid_amount || schedule.schedule_total;
+    });
+  }
+
   return schedules;
 };
 
@@ -1480,8 +1647,12 @@ export const parseLoaHtml = (html, options = {}) => {
   const compactBodyText = compactText(bodyTextWithLines);
   const hiddenLoaData = extractHiddenJsonData($);
   const hiddenValues = Object.values(hiddenLoaData);
+  const letterHeader = getLetterHeader($);
+  const tenderReference = getTenderReference($);
+  const visibleContractor = getContractorDetails($);
 
   const letterNoFull =
+    letterHeader.letter_no_full ||
     getElementValue($, VALUE_SELECTORS.letterNo) ||
     findValueByLabels($, ['letter no', 'loa no', 'letter number']) ||
     findDeepValue(hiddenValues, [/letter.*no/i, /loa.*no/i]) ||
@@ -1498,6 +1669,7 @@ export const parseLoaHtml = (html, options = {}) => {
     ]);
 
   const tenderNo =
+    tenderReference.tender_no ||
     findValueByLabels($, ['tender no', 'tender number', 'nit no', 'tender id']) ||
     findDeepValue(hiddenValues, [/tender.*no/i, /tender.*id/i, /nit.*no/i]) ||
     findRegexValue(bodyTextWithLines, [
@@ -1512,6 +1684,7 @@ export const parseLoaHtml = (html, options = {}) => {
     findRegexValue(bodyTextWithLines, [/Bid\s*(?:ID|No|Number)\.?\s*[:\-]?\s*([^\n\r]+)/i]);
 
   const contractorName =
+    visibleContractor.name ||
     findValueByLabels($, [
       'contractor name',
       'vendor name',
@@ -1522,6 +1695,7 @@ export const parseLoaHtml = (html, options = {}) => {
     findDeepValue(hiddenValues, [/contractor.*name/i, /vendor.*name/i, /firm.*name/i, /supplier.*name/i]);
 
   const contractorAddress =
+    visibleContractor.address ||
     findValueByLabels($, [
       'contractor address',
       'vendor address',
@@ -1531,6 +1705,7 @@ export const parseLoaHtml = (html, options = {}) => {
     ]) || findDeepValue(hiddenValues, [/contractor.*address/i, /vendor.*address/i, /firm.*address/i, /address/i]);
 
   const letterDate =
+    tenderReference.letter_date ||
     getElementValue($, VALUE_SELECTORS.letterDate) ||
     findValueByLabels($, ['letter date', 'loa date', 'date']) ||
     findDeepValue(hiddenValues, [/letter.*date/i, /loa.*date/i, /^date$/i]) ||
@@ -1539,7 +1714,17 @@ export const parseLoaHtml = (html, options = {}) => {
       /(?:Letter\s*)?Date\s*[:\-]?\s*(\d{4}[./-][01]?\d[./-][0-3]?\d)/i
     ]);
 
+  const loaDate =
+    letterHeader.loa_date ||
+    findValueByLabels($, ['loa date', 'letter of acceptance date']) ||
+    findRegexValue(bodyTextWithLines, [
+      /\bDated\s*:\s*([0-3]?\d[./-][01]?\d[./-]\d{2,4})/i
+    ]);
+
+  const tenderValidUptoDate = tenderReference.tender_valid_upto_date;
+
   const workDescription =
+    tenderReference.work_description ||
     findValueByLabels($, [
       'work description',
       'description of work',
@@ -1566,6 +1751,10 @@ export const parseLoaHtml = (html, options = {}) => {
     ]);
 
   const emdAmountRaw =
+    findRegexValue(compactBodyText, [
+      /A\s+sum\s+of\s+(?:Rs\.?|INR|â‚¹)?\s*([0-9,]+(?:\.\d+)?)\s+deposited\s+as\s+Earnest\s+Money/i,
+      /Earnest\s*Money(?:\s*Deposit)?.{0,80}?(?:Rs\.?|INR|â‚¹)\s*([0-9,]+(?:\.\d+)?)/i
+    ]) ||
     findValueByLabels($, ['emd amount', 'earnest money', 'earnest money deposit', 'emd']) ||
     findDeepValue(hiddenValues, [/emd/i, /earnest.*money/i]) ||
     findRegexValue(bodyTextWithLines, [
@@ -1573,6 +1762,9 @@ export const parseLoaHtml = (html, options = {}) => {
     ]);
 
   const performanceGuaranteeRaw =
+    findRegexValue(compactBodyText, [
+      /Performance\s+Guarantee.{0,400}?amounting\s+to\s+(?:Rs\.?|INR|â‚¹)?\s*([0-9,]+(?:\.\d+)?)/i
+    ]) ||
     findValueByLabels($, [
       'performance guarantee amount',
       'performance guarantee',
@@ -1585,10 +1777,22 @@ export const parseLoaHtml = (html, options = {}) => {
     ]);
 
   const completionPeriod =
+    findRegexValue(compactBodyText, [
+      /entire\s+work\s+shall\s+be\s+completed\s+within\s+(\d+)\s*months?/i
+    ]) ||
     findValueByLabels($, ['completion period', 'period of completion', 'delivery period', 'contract period']) ||
     findDeepValue(hiddenValues, [/completion.*period/i, /period.*completion/i, /delivery.*period/i]) ||
     findRegexValue(bodyTextWithLines, [
       /(?:Completion\s*Period|Period\s*of\s*Completion|Delivery\s*Period)\s*[:\-]?\s*([^\n\r]+)/i
+    ]);
+
+  const completionMonths = Number.parseInt(completionPeriod, 10);
+  const normalizedCompletionPeriod = Number.isFinite(completionMonths) ? `${completionMonths} Months` : completionPeriod;
+  const completionDate = addMonthsToDate(loaDate, completionMonths);
+  const rebateRate =
+    getElementValue($, ['input#rebate', '#rebateSpan']) ||
+    findRegexValue(compactBodyText, [
+      /Rebate\s+on\s+Total\s+Value\s*\(%\)\s*([0-9]+(?:\.\d+)?)/i
     ]);
 
   const railwayDetails = getRailwayDetails($, hiddenValues);
@@ -1610,6 +1814,9 @@ export const parseLoaHtml = (html, options = {}) => {
     loa_no: loaNo,
     letter_no_full: letterNoFull,
     letter_date: letterDate,
+    loa_date: normalizeDate(loaDate),
+    completion_date: completionDate,
+    tender_valid_upto_date: tenderValidUptoDate,
     railway_details: railwayDetails,
     contractor: {
       name: contractorName,
@@ -1632,7 +1839,8 @@ export const parseLoaHtml = (html, options = {}) => {
       raw: performanceGuaranteeRaw,
       amount: parseAmount(performanceGuaranteeRaw)
     },
-    completion_period: completionPeriod,
+    completion_period: normalizedCompletionPeriod,
+    rebate_rate: toNumberOrNull(rebateRate),
     schedule_breakup: itemBreakup,
     item_breakup: itemBreakup,
     important_conditions: extractImportantConditions($),
