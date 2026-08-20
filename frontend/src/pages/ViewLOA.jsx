@@ -1,7 +1,7 @@
-import { ChevronDown, Loader2, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronDown, FileCode2, Loader2, RefreshCw, Search, X } from 'lucide-react';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { getViewLoa, getViewLoaList } from '../api/loaApi.js';
+import { getLoaHtmlFileUrl, getViewLoa, getViewLoaList } from '../api/loaApi.js';
 
 const EMPTY_VALUE = '-';
 
@@ -312,12 +312,23 @@ const ViewLOA = () => {
             onChange={handleSelection}
           />
         </div>
-        {listLoading && (
-          <span className="selector-state">
-            <Loader2 className="spin" size={17} />
-            Loading LOAs
-          </span>
-        )}
+        <div className="loa-selector-actions">
+          <button
+            className="button secondary"
+            type="button"
+            disabled={!selectedLoaNo || detailsLoading}
+            onClick={() => window.open(getLoaHtmlFileUrl(selectedLoaNo), '_blank', 'noopener,noreferrer')}
+          >
+            <FileCode2 size={17} />
+            View File
+          </button>
+          {listLoading && (
+            <span className="selector-state">
+              <Loader2 className="spin" size={17} />
+              Loading LOAs
+            </span>
+          )}
+        </div>
       </div>
 
       {error && <div className="notice error">{error}</div>}

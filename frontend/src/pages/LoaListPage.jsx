@@ -1,8 +1,8 @@
-import { CheckCircle2, DatabaseZap, Eye, ListFilter, Loader2, Search } from 'lucide-react';
+import { CheckCircle2, DatabaseZap, Eye, FileCode2, ListFilter, Loader2, Search } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AgGridReact } from 'ag-grid-react';
-import { getLoaLetters, syncLoaToPostgres } from '../api/loaApi.js';
+import { getLoaHtmlFileUrl, getLoaLetters, syncLoaToPostgres } from '../api/loaApi.js';
 
 const formatCurrency = (value) => {
   if (value === null || value === undefined || value === '') {
@@ -153,8 +153,8 @@ const LoaListPage = () => {
     {
       colId: 'actions',
       headerName: 'Actions',
-      minWidth: 130,
-      maxWidth: 150,
+      minWidth: 175,
+      maxWidth: 190,
       sortable: false,
       filter: false,
       floatingFilter: false,
@@ -173,6 +173,15 @@ const LoaListPage = () => {
           <Link className="icon-button" to={`/loa/${record._id}`} title="View">
             <Eye size={17} />
           </Link>
+          <button
+            className="icon-button"
+            type="button"
+            disabled={!record.html_file_name}
+            onClick={() => window.open(getLoaHtmlFileUrl(record.loa_no), '_blank', 'noopener,noreferrer')}
+            title={record.html_file_name ? 'View saved HTML file' : 'Re-upload this LOA to save its HTML file'}
+          >
+            <FileCode2 size={17} />
+          </button>
         </div>
       )
     }

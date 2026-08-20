@@ -43,6 +43,9 @@ export const getLoaById = async (id) => {
   return response.data;
 };
 
+export const getLoaHtmlFileUrl = (loaNo) =>
+  api.getUri({ url: `/loa/file/${encodeURIComponent(loaNo)}` });
+
 export const getViewLoaList = async () => {
   const response = await api.get('/loa/list');
   return response.data;

@@ -10,7 +10,8 @@ import {
   syncLoaByMongoId,
   updateLoa,
   uploadLoa,
-  uploadLoaBulk
+  uploadLoaBulk,
+  viewLoaHtmlFile
 } from '../controllers/loaController.js';
 import { uploadLoaHtml } from '../middleware/upload.js';
 
@@ -24,6 +25,7 @@ router.get('/', getLoaLetters);
 router.get('/list', getViewLoaList);
 router.get('/by-number', getLoaByNumber);
 router.get('/by-number/:loa_no', getLoaByNumber);
+router.get('/file/:loaNo', viewLoaHtmlFile);
 router.get('/record/:id', getLoaById);
 router.get('/:loaNo', getViewLoa);
 router.put('/:id', updateLoa);

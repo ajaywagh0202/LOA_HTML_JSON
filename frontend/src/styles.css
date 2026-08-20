@@ -1045,6 +1045,16 @@ th {
   font-weight: 700;
 }
 
+.loa-selector-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.loa-selector-actions .button {
+  white-space: nowrap;
+}
+
 .view-loa-placeholder {
   display: grid;
   place-items: center;
@@ -1266,6 +1276,11 @@ th {
 
   .grid-toolbar {
     flex-wrap: wrap;
+  }
+
+  .loa-selector-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .grid-toolbar .button {

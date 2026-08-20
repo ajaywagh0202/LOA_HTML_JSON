@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import LoaLetter from '../models/LoaLetter.js';
+import { getLoaHtmlFilePath } from '../services/loaHtmlFileService.js';
 import { processLoaHtmlFile } from '../services/loaUploadService.js';
 import { getPostgresLoaDetails, listPostgresLoas } from '../services/postgresLoaRead.js';
 import { syncLoaToPostgres } from '../services/postgresLoaSync.js';
@@ -188,6 +189,30 @@ export const getLoaByNumber = asyncHandler(async (req, res) => {
 
 export const getLoaByNumberPost = getLoaByNumber;
 
+export const viewLoaHtmlFile = asyncHandler(async (req, res) => {
+  const loaNo = String(req.params.loaNo || '').trim();
+
+  if (!loaNo || loaNo.length > 100 || !/^[a-zA-Z0-9]+$/.test(loaNo)) {
+    throw createError('Invalid LOA number.', 400);
+  }
+
+  const record = await LoaLetter.findOne({ loa_no: loaNo }).select('html_file_name').lean();
+  const filePath = await getLoaHtmlFilePath(record?.html_file_name);
+
+  if (!filePath) {
+    throw createError('HTML file not found. Re-upload this LOA to save its source file.', 404);
+  }
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Disposition', `inline; filename="${record.html_file_name}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader(
+    'Content-Security-Policy',
+    "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"
+  );
+  res.sendFile(filePath);
+});
+
 export const getViewLoaList = asyncHandler(async (req, res) => {
   try {
     const records = await listPostgresLoas();
@@ -278,7 +303,8 @@ export const updateLoa = asyncHandler(async (req, res) => {
     'letter_date',
     'contract_value',
     'json_data',
-    'original_file_name'
+    'original_file_name',
+    'html_file_name'
   ];
 
   const updates = {};

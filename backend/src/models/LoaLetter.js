@@ -42,6 +42,10 @@ const LoaLetterSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    html_file_name: {
+      type: String,
+      trim: true
+    },
     uploaded_at: {
       type: Date,
       default: Date.now

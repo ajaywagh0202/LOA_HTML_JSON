@@ -1,5 +1,6 @@
 import LoaLetter from '../models/LoaLetter.js';
 import { parseLoaHtml } from '../utils/loaParser.js';
+import { saveLoaHtmlFile } from './loaHtmlFileService.js';
 import { syncLoaToPostgres } from './postgresLoaSync.js';
 
 const createUploadError = (message, statusCode) => {
@@ -16,6 +17,12 @@ export const processLoaHtmlFile = async (file) => {
     throw createUploadError('Unable to extract LOA number from the uploaded HTML file.', 422);
   }
 
+  const htmlFileName = await saveLoaHtmlFile({
+    buffer: file.buffer,
+    loaNo: parsed.loa_no,
+    tenderNo: parsed.tender_no
+  });
+
   const payload = {
     loa_no: parsed.loa_no,
     letter_no_full: parsed.letter_no_full,
@@ -26,6 +33,7 @@ export const processLoaHtmlFile = async (file) => {
     contract_value: parsed.contract_value,
     json_data: parsed.json_data,
     original_file_name: file.originalname,
+    html_file_name: htmlFileName,
     uploaded_at: new Date()
   };
 
