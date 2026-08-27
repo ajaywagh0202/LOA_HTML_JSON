@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
 import EditLoaPage from './pages/EditLoaPage.jsx';
 import LoaDetailsPage from './pages/LoaDetailsPage.jsx';
+import LoaHtmlFilePage from './pages/LoaHtmlFilePage.jsx';
 import LoaListPage from './pages/LoaListPage.jsx';
 import UploadLoaPage from './pages/UploadLoaPage.jsx';
 import ViewLOA from './pages/ViewLOA.jsx';
@@ -17,6 +18,7 @@ const App = () => {
         <Route path="/loa" element={<LoaListPage />} />
         <Route path="/loa/:id" element={<LoaDetailsPage />} />
         <Route path="/loa/:id/edit" element={<EditLoaPage />} />
+        <Route path="/loa-file/:loaNo" element={<LoaHtmlFilePage />} />
         <Route path="*" element={<Navigate to="/upload" replace />} />
       </Route>
     </Routes>

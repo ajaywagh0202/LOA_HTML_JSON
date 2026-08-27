@@ -1,7 +1,7 @@
 import { ChevronDown, FileCode2, Loader2, RefreshCw, Search, X } from 'lucide-react';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { getLoaHtmlFileUrl, getViewLoa, getViewLoaList } from '../api/loaApi.js';
+import { getViewLoa, getViewLoaList } from '../api/loaApi.js';
 
 const EMPTY_VALUE = '-';
 
@@ -317,7 +317,7 @@ const ViewLOA = () => {
             className="button secondary"
             type="button"
             disabled={!selectedLoaNo || detailsLoading}
-            onClick={() => window.open(getLoaHtmlFileUrl(selectedLoaNo), '_blank', 'noopener,noreferrer')}
+            onClick={() => window.open(`/loa-file/${encodeURIComponent(selectedLoaNo)}`, '_blank', 'noopener,noreferrer')}
           >
             <FileCode2 size={17} />
             View File

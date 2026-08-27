@@ -2,7 +2,7 @@ import { CheckCircle2, DatabaseZap, Eye, FileCode2, ListFilter, Loader2, Search 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AgGridReact } from 'ag-grid-react';
-import { getLoaHtmlFileUrl, getLoaLetters, syncLoaToPostgres } from '../api/loaApi.js';
+import { getLoaLetters, syncLoaToPostgres } from '../api/loaApi.js';
 
 const formatCurrency = (value) => {
   if (value === null || value === undefined || value === '') {
@@ -177,7 +177,7 @@ const LoaListPage = () => {
             className="icon-button"
             type="button"
             disabled={!record.html_file_name}
-            onClick={() => window.open(getLoaHtmlFileUrl(record.loa_no), '_blank', 'noopener,noreferrer')}
+            onClick={() => window.open(`/loa-file/${encodeURIComponent(record.loa_no)}`, '_blank', 'noopener,noreferrer')}
             title={record.html_file_name ? 'View saved HTML file' : 'Re-upload this LOA to save its HTML file'}
           >
             <FileCode2 size={17} />
