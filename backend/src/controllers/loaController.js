@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import LoaLetter from '../models/LoaLetter.js';
 import { getLoaHtmlFilePath } from '../services/loaHtmlFileService.js';
-import { processLoaHtmlFile } from '../services/loaUploadService.js';
+import { processLoaHtmlFile,processSingleLoaHtmlFile } from '../services/loaUploadService.js';
 import { getPostgresLoaDetails, listPostgresLoas } from '../services/postgresLoaRead.js';
 import { syncLoaToPostgres } from '../services/postgresLoaSync.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -54,6 +54,27 @@ export const uploadLoa = asyncHandler(async (req, res) => {
   }
 
   const { action, mongoId, postgresSync, record } = await processLoaHtmlFile(req.file);
+
+  res.status(action === 'created' ? 201 : 200).json({
+    success: true,
+    action,
+    mongoId,
+    postgresSync,
+    data: record
+  });
+});
+
+export const uploadSingleLoa = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw createError('HTML file is required.', 400);
+  }
+
+  const { action, mongoId, postgresSync, record } = await processSingleLoaHtmlFile(
+    req.file,
+    req.body.whether_loa_restricted ?? req.body.loa_restricted,
+    req.body.section_location ?? req.body.location,
+    req.body.divcode ?? req.body.unit
+  );
 
   res.status(action === 'created' ? 201 : 200).json({
     success: true,
@@ -302,6 +323,9 @@ export const updateLoa = asyncHandler(async (req, res) => {
     'contractor_name',
     'letter_date',
     'contract_value',
+    'whether_loa_restricted',
+    'section_location',
+    'divcode',
     'json_data',
     'original_file_name',
     'html_file_name'

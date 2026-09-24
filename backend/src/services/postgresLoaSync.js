@@ -116,7 +116,7 @@ const getBreakups = (schedule, awardedItem) => {
   const breaks = Array.isArray(schedule.item_breaks) ? schedule.item_breaks : [];
 
   return breaks.filter((breakup) => {
-    const parentId = emptyToNull(breakup.parent_awarded_item_id);
+    const parentId = emptyToNull(breakup.parent_awarded_item_id || breakup.item_id);
     if (targetId && parentId) {
       return targetId === parentId;
     }
@@ -307,10 +307,10 @@ const updateExistingSchedules = async (client, schedules) => {
       `
         UPDATE public.contract_schedules
         SET
-          bid_rate_or_unit_rate = COALESCE($2, bid_rate_or_unit_rate),
-          bid_type = COALESCE($3, bid_type),
-          bid_type_text = COALESCE($4, bid_type_text),
-          bid_amount = COALESCE($5, bid_amount)
+          bid_rate_or_unit_rate = $2,
+          bid_type = $3,
+          bid_type_text = $4,
+          bid_amount = $5
         WHERE schedule_id = $1
       `,
       [
@@ -318,7 +318,7 @@ const updateExistingSchedules = async (client, schedules) => {
         toNumeric(schedule.bid_rate_or_unit_rate || schedule.bid_rate),
         emptyToNull(schedule.bid_type),
         emptyToNull(schedule.bid_type_text),
-        toNumeric(schedule.bid_amount || schedule.schedule_total)
+        toNumeric(schedule.bid_amount)
       ]
     );
   }

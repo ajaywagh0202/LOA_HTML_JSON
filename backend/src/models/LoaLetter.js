@@ -34,6 +34,10 @@ const LoaLetterSchema = new mongoose.Schema(
     contract_value: {
       type: Number
     },
+    whether_loa_restricted: { type: String, enum: ['Y', 'N'] },
+    section_location: { type: String, trim: true },
+    divcode: { type: String, trim: true },
+    restriction_sync_pending: { type: Boolean, default: false },
     json_data: {
       type: mongoose.Schema.Types.Mixed,
       default: {}

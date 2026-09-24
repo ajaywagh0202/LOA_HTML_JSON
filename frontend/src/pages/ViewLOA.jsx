@@ -27,7 +27,7 @@ const formatDate = (value) => {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('en-GB');
 };
 
-const scheduleColumnDefs = [
+export const scheduleColumnDefs = [
   { field: 'schedule_id', headerName: 'Schedule ID', minWidth: 130 },
   { field: 'item_sno', headerName: 'Item SNo', minWidth: 105 },
   { field: 'item_desc', headerName: 'Item Desc', minWidth: 240, wrapText: true, autoHeight: true },
@@ -62,7 +62,7 @@ const scheduleColumnDefs = [
   }
 ];
 
-const itemColumnDefs = [
+export const itemColumnDefs = [
   { field: 'schedule_id', headerName: 'Schedule ID', minWidth: 130 },
   { field: 'parent_awarded_item_id', headerName: 'Parent Awarded Item ID', minWidth: 205 },
   { field: 'parent_awarded_item_sno', headerName: 'Parent Awarded Item SNo', minWidth: 220 },

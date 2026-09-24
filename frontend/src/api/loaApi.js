@@ -31,6 +31,39 @@ export const uploadLoaFilesBulk = async (files, onUploadProgress) => {
   return response.data;
 };
 
+
+export const uploadSingleLoaFile = async (file,
+  loa_restricted,
+  location,
+  unit) => {
+  const formData = new FormData();
+  
+  loa_restricted = loa_restricted === 'Yes' || loa_restricted === 'Y' ? 'Y' : 'N';
+
+  formData.append('file', file);
+  formData.append('whether_loa_restricted', loa_restricted);
+  formData.append('section_location', location);
+  formData.append('divcode', unit);
+
+  const response = await api.post('/loa/upload-single', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data;
+}
+
+export const getUnits = async () => {
+  const response = await api.get('/loa/unit');
+  return response.data;
+};
+
+export const getLoaRestrictions = async (id) => (await api.get(`/loa/record/${id}/restrictions`)).data;
+export const updateLoaRestrictions = async (id, rows, revision) => (
+  await api.put(`/loa/record/${id}/restrictions`, { rows, revision })
+).data;
+
 export const getLoaLetters = async ({ page = 1, limit = 10, search = '', syncStatus = 'all' } = {}) => {
   const response = await api.get('/loa', {
     params: { page, limit, search, syncStatus }

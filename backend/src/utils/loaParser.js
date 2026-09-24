@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import he from 'he';
+import { tableRows, visibleBreakupGroups } from './loaTables.js';
 
 const VALUE_SELECTORS = {
   letterNo: ['#letterNoVal', 'span#letterNoVal'],
@@ -509,13 +510,13 @@ const parseJsonCandidate = (rawValue) => {
 const extractHiddenJsonData = ($) => {
   const hiddenJson = {};
 
-  $('input[id^="loaData"]').each((_, input) => {
+  $('input[type="hidden"], input[id^="loaData"], textarea, script[type="application/json"]').each((index, input) => {
     const element = $(input);
-    const id = element.attr('id');
-    const rawValue = element.attr('value') || '';
+    const id = element.attr('id') || element.attr('name') || `embedded_json_${index}`;
+    const rawValue = element.attr('value') || element.text() || '';
     const parsed = parseJsonCandidate(rawValue);
 
-    if (id && parsed !== null) {
+    if (id && parsed !== null && typeof parsed === 'object') {
       hiddenJson[id] = parsed;
     }
   });
@@ -1010,7 +1011,8 @@ const extractItemBreakupFromTableRows = ($) => {
 
 const getInputValueFromRow = ($, row, prefix) => {
   const input = $(row)
-    .find(`input[id^="${prefix}"]`)
+    .find(`input[id^="${prefix}"], input[name^="${prefix}"]`)
+    .filter((_, element) => $(element).closest('tr')[0] === row)
     .first();
 
   return input.length ? compactText(input.attr('value') || '') : '';
@@ -1018,9 +1020,10 @@ const getInputValueFromRow = ($, row, prefix) => {
 
 const getInputSuffixFromRow = ($, row, prefix) => {
   const input = $(row)
-    .find(`input[id^="${prefix}"]`)
+    .find(`input[id^="${prefix}"], input[name^="${prefix}"]`)
+    .filter((_, element) => $(element).closest('tr')[0] === row)
     .first();
-  const id = input.attr('id') || '';
+  const id = input.attr('id') || input.attr('name') || '';
   const match = id.match(new RegExp(`^${prefix}(\\d+)$`));
 
   return match?.[1] || '';
@@ -1096,7 +1099,7 @@ const createScheduleNode = (schedule) => ({
 
 const normalizeAwardedItem = ($, row, scheduleId) => {
   const cells = $(row)
-    .find('td,th')
+    .children('td,th')
     .toArray()
     .map((cell) => compactText($(cell).text()));
   const itemId = getInputSuffixFromRow($, row, 'itemSNo');
@@ -1105,6 +1108,12 @@ const normalizeAwardedItem = ($, row, scheduleId) => {
   const updationRate = getInputValueFromRow($, row, 'updationRate');
   const updationType = getInputValueFromRow($, row, 'updationType');
   const bidType = getInputValueFromRow($, row, 'bidType');
+  const unitLabel = $(row).find('[id^="qtyUnitDesc"], [name^="qtyUnitDesc"]')
+    .filter((_, element) => $(element).closest('tr')[0] === row).first();
+  const unitCell = $(row).find('input[id^="qtyUnit"], input[name^="qtyUnit"]')
+    .filter((_, element) => $(element).closest('tr')[0] === row).first().closest('td,th').clone();
+  unitCell.find('input,script,style').remove();
+  const unitDescription = compactText(unitLabel.text()) || compactText(unitCell.text());
 
   return {
     item_id: itemId,
@@ -1114,7 +1123,7 @@ const normalizeAwardedItem = ($, row, scheduleId) => {
     item_desc: $(`#itemDesc${itemId}`).length ? compactText($(`#itemDesc${itemId}`).text()) : cells[1] || '',
     item_code: getInputValueFromRow($, row, 'itemCode'),
     item_qty: getInputValueFromRow($, row, 'itemQty'),
-    qty_unit: getInputValueFromRow($, row, 'qtyUnit'),
+    qty_unit: unitDescription || getInputValueFromRow($, row, 'qtyUnit'),
     unit_rate: getInputValueFromRow($, row, 'rate'),
     basic_value: getInputValueFromRow($, row, 'basicValue'),
     escalation_percent: updationRate,
@@ -1136,7 +1145,7 @@ const extractAwardedSchedules = ($) => {
 
   $('tr').each((_, row) => {
     const cells = $(row)
-      .find('td,th')
+      .children('td,th')
       .toArray()
       .map((cell) => compactText($(cell).text()));
 
@@ -1197,80 +1206,6 @@ const extractAwardedSchedules = ($) => {
   return { schedules, scheduleById };
 };
 
-const extractVisibleItemBreakupDetails = ($) => {
-  const groups = new Map();
-  let currentScheduleLabel = '';
-  let currentGroup = null;
-  let insideDetailRows = false;
-
-  $('tr').each((_, row) => {
-    const cells = $(row)
-      .find('td,th')
-      .toArray()
-      .map((cell) => compactText($(cell).text()));
-
-    if (!cells.some(Boolean)) {
-      return;
-    }
-
-    if (/^Schedule$/i.test(cells[0]) && cells[1]) {
-      currentScheduleLabel = cells[1];
-      currentGroup = null;
-      insideDetailRows = false;
-      return;
-    }
-
-    const rowId = $(row).attr('id') || '';
-    const targetMatch = rowId.match(/^tr(\d+)$/);
-    if (targetMatch) {
-      const itemHeaderMatch = cells[0]?.match(/Item\s*-\s*(.+)/i);
-      currentGroup = {
-        view_details_target_id: targetMatch[1],
-        schedule_label: currentScheduleLabel,
-        item_sno: itemHeaderMatch?.[1] ? compactText(itemHeaderMatch[1]) : '',
-        item_desc: cells[1] || '',
-        item_breaks: []
-      };
-      groups.set(currentGroup.view_details_target_id, currentGroup);
-      insideDetailRows = false;
-      return;
-    }
-
-    if (!currentGroup) {
-      return;
-    }
-
-    const headerText = cells.join(' ').toLowerCase();
-    if (headerText.includes('s no') && headerText.includes('item no') && headerText.includes('description of item')) {
-      insideDetailRows = true;
-      return;
-    }
-
-    if (!insideDetailRows || cells.length < 7) {
-      return;
-    }
-
-    const item = {
-      item_sno: cells[0] || '',
-      item_code: cells[1] || '',
-      item_desc: cells[2] || '',
-      qty_unit: cells[3] || '',
-      item_qty: cells[4] || '',
-      unit_rate: cells[5] || '',
-      amount: cells[6] || '',
-      advt_value: cells[6] || '',
-      bid_rate_or_unit_rate: '',
-      bid_amount: '',
-      source: 'item_breakup'
-    };
-
-    if (item.item_code || item.item_desc || item.amount) {
-      currentGroup.item_breaks.push(item);
-    }
-  });
-
-  return groups;
-};
 
 const getHiddenSchedules = (hiddenValues) => {
   return collectValuesByKeyPatterns(hiddenValues, ITEM_SECTION_KEY_PATTERNS.master)
@@ -1316,8 +1251,13 @@ const mergeHiddenScheduleValues = (schedule, rawSchedule = {}) => {
 
 const extractScheduleBreakup = ($, hiddenValues) => {
   const { schedules, scheduleById } = extractAwardedSchedules($);
-  const visibleBreakupByTargetId = extractVisibleItemBreakupDetails($);
+  const visibleBreakupByTargetId = visibleBreakupGroups($);
   const hiddenSchedules = getHiddenSchedules(hiddenValues);
+  const findVisibleGroup = (schedule, itemId, sno) => visibleBreakupByTargetId.get(itemId)
+    || [...visibleBreakupByTargetId.values()].find((group) =>
+      normalizeSnoForCompare(group.item_sno) === normalizeSnoForCompare(sno)
+      && normalizeSnoForCompare(parseScheduleTitle(`Schedule ${group.schedule_label}`).item_sno)
+        === normalizeSnoForCompare(schedule.item_sno));
 
   hiddenSchedules.forEach((rawSchedule) => {
     const scheduleId = compactText(rawSchedule.schId || rawSchedule.schedule_id || '');
@@ -1350,7 +1290,20 @@ const extractScheduleBreakup = ($, hiddenValues) => {
 
     hiddenItemData.forEach((rawItem) => {
       const itemId = compactText(rawItem.itemId || '');
-      const visibleGroup = itemId ? visibleBreakupByTargetId.get(itemId) : null;
+      const visibleGroup = findVisibleGroup(schedule, itemId, rawItem.itemSrNo);
+      const visibleItem = schedule.awarded_items.find((item) => item.item_id === itemId);
+      const hiddenUnit = normalizeItemRecord(rawItem).qty_unit;
+      if (visibleItem && (!visibleItem.qty_unit || /^\d+$/.test(visibleItem.qty_unit))
+        && hiddenUnit && !/^\d+$/.test(hiddenUnit)) {
+        visibleItem.qty_unit = hiddenUnit;
+      }
+      if (itemId && !schedule.awarded_items.some((item) => item.item_id === itemId)) {
+        const normalized = normalizeHiddenItemBreak(rawItem);
+        schedule.awarded_items.push({ ...normalized, parent_schedule_id: schedule.schedule_id,
+          view_details_target_id: visibleGroup?.view_details_target_id || '',
+          bid_unit: compactText(rawItem.bidUnit ?? ''),
+          escalation_text: formatEscalation(normalized.escalation_percent, rawItem.updationType) });
+      }
 
       if (visibleGroup?.item_breaks?.length) {
         schedule.item_breaks.push(
@@ -1379,14 +1332,9 @@ const extractScheduleBreakup = ($, hiddenValues) => {
       schedule.item_directory = viewDetailItem.item_desc;
     }
 
-    if (schedule.item_breaks.length) {
-      return;
-    }
-
     schedule.awarded_items.forEach((awardedItem) => {
-      const visibleGroup = awardedItem.view_details_target_id
-        ? visibleBreakupByTargetId.get(awardedItem.view_details_target_id)
-        : null;
+      if (schedule.item_breaks.some((item) => (item.parent_awarded_item_id || item.item_id) === awardedItem.item_id)) return;
+      const visibleGroup = findVisibleGroup(schedule, awardedItem.view_details_target_id || awardedItem.item_id, awardedItem.item_sno);
 
       if (visibleGroup?.item_breaks?.length) {
         schedule.item_breaks.push(
@@ -1416,17 +1364,6 @@ const extractScheduleBreakup = ($, hiddenValues) => {
       }
     });
   });
-
-  const firstSchedule = schedules[0];
-  if (firstSchedule) {
-    schedules.forEach((schedule) => {
-      schedule.bid_rate_or_unit_rate =
-        schedule.bid_rate_or_unit_rate || firstSchedule.bid_rate_or_unit_rate;
-      schedule.bid_type = schedule.bid_type || firstSchedule.bid_type;
-      schedule.bid_type_text = schedule.bid_type_text || firstSchedule.bid_type_text;
-      schedule.bid_amount = schedule.bid_amount || schedule.schedule_total;
-    });
-  }
 
   return schedules;
 };
@@ -1540,7 +1477,7 @@ const toReferenceScheduleNode = (schedule) => {
     unit: null,
     schedule_rate: null,
     bid_rate: toNumberOrNull(schedule.bid_rate_or_unit_rate),
-    bid_amount: toNumberOrNull(schedule.schedule_total || schedule.bid_amount),
+    bid_amount: toNumberOrNull(schedule.bid_amount),
     amount: toNumberOrNull(schedule.advt_value),
     children
   };
@@ -1639,6 +1576,15 @@ const createReferenceJson = ($, extracted, hiddenLoaData, scheduleBreakup, optio
       schedules: scheduleBreakup.map((schedule) => toReferenceScheduleNode(schedule))
     }
   };
+};
+
+const nullifyBlankValues = (value) => {
+  if (typeof value === 'string') return !value.trim() || value.trim().toLowerCase() === 'null' ? null : value;
+  if (Array.isArray(value)) return value.map(nullifyBlankValues);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, nullifyBlankValues(child)]));
+  }
+  return value;
 };
 
 export const parseLoaHtml = (html, options = {}) => {
@@ -1846,13 +1792,19 @@ export const parseLoaHtml = (html, options = {}) => {
     important_conditions: extractImportantConditions($),
     hidden_loa_data: hiddenLoaData
   };
+  // Preserve unfamiliar columns/sections without guessing their business meaning.
+  extracted.source_tables = $('table').toArray().map((table, index) => ({
+    table_index: index, table_id: $(table).attr('id') || '',
+    rows: tableRows($, table).map(({ cells }) => cells).filter((cells) => cells.some(Boolean))
+  })).filter((table) => table.rows.length);
+  extracted.parse_warnings = itemBreakup.length ? [] : ['No structured schedules were recognized. Original tables are retained in source_tables.'];
   const loaFull = createReferenceJson($, summaryExtracted, hiddenLoaData, itemBreakup, options);
   extracted.source_file = loaFull.source_file;
   extracted.letter = loaFull.letter;
   extracted.awarded_quantities_rates = loaFull.awarded_quantities_rates;
   extracted.loa_full = loaFull;
 
-  return {
+  return nullifyBlankValues({
     loa_no: loaNo,
     letter_no_full: letterNoFull,
     tender_no: tenderNo,
@@ -1861,5 +1813,5 @@ export const parseLoaHtml = (html, options = {}) => {
     letter_date: letterDate,
     contract_value: summaryExtracted.contract_value,
     json_data: extracted
-  };
+  });
 };

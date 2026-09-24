@@ -6,6 +6,7 @@ import LoaHtmlFilePage from './pages/LoaHtmlFilePage.jsx';
 import LoaListPage from './pages/LoaListPage.jsx';
 import UploadLoaPage from './pages/UploadLoaPage.jsx';
 import ViewLOA from './pages/ViewLOA.jsx';
+import UploadSingleLoaPage from './pages/UploadSingleLoaPage.jsx';
 import React from 'react';
 
 const App = () => {
@@ -21,6 +22,7 @@ const App = () => {
         <Route path="/loa-file/:loaNo" element={<LoaHtmlFilePage />} />
         <Route path="*" element={<Navigate to="/upload" replace />} />
       </Route>
+      <Route path="/single-loa-upload" element={<UploadSingleLoaPage />} />
     </Routes>
   );
 };
